@@ -1,6 +1,9 @@
-./checkpoints
-./outputs
-./data/*
+checkpoints
+outputs
+data
+*jpg
+*mat
+*png
 *tar
 *.jpg
 *.png
