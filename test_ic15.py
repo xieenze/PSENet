@@ -1,3 +1,4 @@
+#coding:utf8
 import os
 import cv2
 import sys
@@ -19,6 +20,8 @@ import util
 from pse import pse
 # python pse
 # from pypse import pse as pypse
+
+from IPython import embed
 
 def extend_3c(img):
     img = img.reshape(img.shape[0], img.shape[1], 1)
@@ -140,10 +143,18 @@ def test(args):
         # python version pse
         # pred = pypse(kernels, args.min_kernel_area / (args.scale * args.scale))
         
-        # scale = (org_img.shape[0] * 1.0 / pred.shape[0], org_img.shape[1] * 1.0 / pred.shape[1])
-        scale = (org_img.shape[1] * 1.0 / pred.shape[1], org_img.shape[0] * 1.0 / pred.shape[0])
         label = pred
         label_num = np.max(label) + 1
+        
+        #方法1 直接resize
+        #scale = (1,1)
+        #label = cv2.resize(label, (org_img.shape[1], org_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+        #score = cv2.resize(score, (org_img.shape[1], org_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+        #方法2 先算坐标再乘scale
+        scale = (org_img.shape[1] * 1.0 / pred.shape[1], org_img.shape[0] * 1.0 / pred.shape[0])
+        
+
+
         bboxes = []
         for i in range(1, label_num):
             points = np.array(np.where(label == i)).transpose((1, 0))[:, ::-1]
@@ -180,6 +191,8 @@ def test(args):
     print(cmd)
     sys.stdout.flush()
     util.cmd.cmd(cmd)
+    cmd = 'cd eval;sh eval_ic15.sh'
+    os.system(cmd)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Hyperparams')
