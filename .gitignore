@@ -1,0 +1,8 @@
+./checkpoints
+./outputs
+./data
+*tar
+*.jpg
+*.png
+*.txt
+*.pyc
