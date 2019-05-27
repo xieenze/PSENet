@@ -218,7 +218,7 @@ def main(args):
         data_loader,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=3,
+        num_workers=10,
         drop_last=True,
         pin_memory=True)
 
