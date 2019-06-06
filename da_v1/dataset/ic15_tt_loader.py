@@ -187,7 +187,7 @@ def shrink(bboxes, rate, max_shr=20):
 
 
 class IC15_TT_Loader(data.Dataset):
-    def __init__(self, is_transform=False, img_size=None, kernel_num=7, min_scale=0.4, short_size=736):
+    def __init__(self, is_transform=False, img_size=None, kernel_num=7, min_scale=0.4, short_size=736, debug=False):
         self.is_transform = is_transform
 
         self.img_size = img_size if (img_size is None or isinstance(img_size, tuple)) else (img_size, img_size)
@@ -200,6 +200,8 @@ class IC15_TT_Loader(data.Dataset):
 
         self.ic15_img_paths = []
         self.ic15_gt_paths = []
+
+        self.debug = debug
 
         #获取ic15的所有图片路径
         for data_dir, gt_dir in zip(data_dirs, gt_dirs):
@@ -307,6 +309,9 @@ class IC15_TT_Loader(data.Dataset):
             tt_img = Image.fromarray(tt_img)
             tt_img = tt_img.convert('RGB')
 
+        if self.debug == True:
+            return ic15_img, gt_text, gt_kernels, training_mask, tt_img
+
         ic15_img = transforms.ToTensor()(ic15_img)
         ic15_img = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(ic15_img)
 
@@ -324,11 +329,18 @@ class IC15_TT_Loader(data.Dataset):
 
 
 if __name__ == "__main__":
-    loader = IC15_TT_Loader(is_transform=True, img_size=640, kernel_num=7, min_scale=0.4, short_size=736)
-    ic15_img, gt_text, gt_kernels, training_mask, tt_img = loader[1]
-    embed()
+    loader = IC15_TT_Loader(is_transform=True, img_size=640, kernel_num=7, min_scale=0.4, short_size=736,debug=True)
+    ic15_img, gt_text, gt_kernels, training_mask, tt_img = loader[100]
+    ic15_img = np.array(ic15_img)[:,:,::-1]
+    tt_img = np.array(tt_img)[:,:,::-1]
 
-
+    raw = []
+    img = cv2.copyMakeBorder(ic15_img, 3, 3, 3, 3, cv2.BORDER_CONSTANT, value=[255, 0, 0])
+    raw.append(img)
+    img = cv2.copyMakeBorder(tt_img, 3, 3, 3, 3, cv2.BORDER_CONSTANT, value=[255, 0, 0])
+    raw.append(img)
+    res = np.concatenate(raw, axis=1)
+    cv2.imwrite('test.jpg',res)
 
 
 

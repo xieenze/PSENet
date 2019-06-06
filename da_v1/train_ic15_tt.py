@@ -193,7 +193,7 @@ def train(train_loader, model, model_frozen, criterion, optimizer, epoch):
             print(output_log)
             sys.stdout.flush()
 
-    return (losses.avg, score_text['Mean Acc'], score_kernel['Mean Acc'], score_text['Mean IoU'], score_kernel['Mean IoU'])
+    return (losses.avg, score_text['Mean Acc'], score_kernel['Mean Acc'], score_text['Mean IoU'], score_kernel['Mean IoU'], output_log)
 
 def adjust_learning_rate(args, optimizer, epoch):
     global state
@@ -277,7 +277,7 @@ def main(args):
         adjust_learning_rate(args, optimizer, epoch)
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.n_epoch, optimizer.param_groups[0]['lr']))
 
-        train_loss, train_te_acc, train_ke_acc, train_te_iou, train_ke_iou = train(train_loader, model, model_frozen, dice_loss, optimizer, epoch)
+        train_loss, train_te_acc, train_ke_acc, train_te_iou, train_ke_iou, output_log = train(train_loader, model, model_frozen, dice_loss, optimizer, epoch)
         save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
@@ -286,7 +286,10 @@ def main(args):
             }, checkpoint=args.checkpoint)
 
         logger.append([optimizer.param_groups[0]['lr'], train_loss, train_te_acc, train_te_iou])
+        with open(os.path.join(args.checkpoint, 'log_2.txt'), 'a+') as f:
+            f.write(output_log + "\n")
     logger.close()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Hyperparams')
