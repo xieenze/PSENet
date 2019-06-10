@@ -149,12 +149,19 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
 
     return output_log
 
-def adjust_learning_rate(args, optimizer, epoch):
+def adjust_learning_rate_G(args, optimizer, epoch):
     global state
     if epoch in args.schedule:
-        args.lr = args.lr * 0.1
+        args.lr_G = args.lr_G * 0.1
         for param_group in optimizer.param_groups:
-            param_group['lr'] = args.lr
+            param_group['lr'] = args.lr_G
+
+def adjust_learning_rate_D(args, optimizer, epoch):
+    global state
+    if epoch in args.schedule:
+        args.lr_D = args.lr_D * 0.1
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = args.lr_D
 
 def save_checkpoint(state, checkpoint='checkpoint', filename='checkpoint.pth.tar'):
     filepath = os.path.join(checkpoint, filename)
@@ -174,7 +181,7 @@ def main(args):
             args.checkpoint += "_pretrain_ic17"
 
     print ('\ncheckpoint path: %s'%args.checkpoint)
-    print ('init lr: %.8f'%args.lr)
+    print ('init lr: %.8f'%args.lr_G)
     print ('schedule: ', args.schedule)
     print('loading model.....')
     sys.stdout.flush()
@@ -203,9 +210,9 @@ def main(args):
     model_D = models.FCDiscriminator(num_classes=kernel_num)
     model_D = torch.nn.DataParallel(model_D).cuda().train()
 
-    optimizer_G  = torch.optim.SGD(model_G.parameters(), lr=args.lr, momentum=0.99, weight_decay=5e-4)
+    optimizer_G  = torch.optim.SGD(model_G.parameters(), lr=args.lr_G, momentum=0.99, weight_decay=5e-4)
     #learning rate D 可能需要修改
-    optimizer_D = torch.optim.Adam(model_D.parameters(), lr=args.lr, betas=(0.9, 0.99))
+    optimizer_D = torch.optim.Adam(model_D.parameters(), lr=args.lr_D, betas=(0.9, 0.99))
 
     if args.pretrain:
         print('Using pretrained model.')
@@ -230,8 +237,8 @@ def main(args):
     # embed(header='load model')
 
     for epoch in range(start_epoch, args.n_epoch):
-        adjust_learning_rate(args, optimizer_G, epoch)
-        adjust_learning_rate(args, optimizer_D, epoch)
+        adjust_learning_rate_G(args, optimizer_G, epoch)
+        adjust_learning_rate_D(args, optimizer_D, epoch)
 
         print('\nEpoch: [{} | {}] LR_G: {}  LR_D: {}'.format(epoch + 1, args.n_epoch,
                                                              optimizer_G.param_groups[0]['lr'],
@@ -248,14 +255,14 @@ def main(args):
         save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': model_G.state_dict(),
-                'lr': args.lr,
+                'lr': args.lr_G,
                 'optimizer' : optimizer_G.state_dict(),
             }, checkpoint=args.checkpoint,
                 filename='G.pth')
 
         save_checkpoint({
             'state_dict': model_D.state_dict(),
-            'lr': args.lr,
+            'lr': args.lr_D,
             'optimizer': optimizer_D.state_dict(),
             }, checkpoint=args.checkpoint,
                 filename='D.pth')
@@ -263,7 +270,7 @@ def main(args):
 
         #log for training process
         log_path = os.path.join(args.checkpoint, 'log.txt')
-        os.system('rm -rf {}'.format(log_path))
+        # os.system('rm -rf {}'.format(log_path))
         with open(log_path, 'a+') as f:
             f.write(output_log + "\n")
 
@@ -279,7 +286,9 @@ if __name__ == '__main__':
                         help='Decrease learning rate at these epochs.')
     parser.add_argument('--batch_size', nargs='?', type=int, default=16, 
                         help='Batch Size')
-    parser.add_argument('--lr', nargs='?', type=float, default=1e-3, 
+    parser.add_argument('--lr_G', nargs='?', type=float, default=1e-3,
+                        help='Learning Rate')
+    parser.add_argument('--lr_D', nargs='?', type=float, default=1e-4,
                         help='Learning Rate')
     parser.add_argument('--resume', nargs='?', type=str, default=None,    
                         help='Path to previous saved model to restart from')
