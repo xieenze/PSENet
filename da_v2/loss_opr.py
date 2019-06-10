@@ -17,6 +17,11 @@ from util import Logger, AverageMeter
 import time
 import util
 
+
+def bce_loss():
+    bce_loss = torch.nn.BCEWithLogitsLoss()
+    return bce_loss
+
 def ohem_single(score, gt_text, training_mask):
     pos_num = (int)(torch.sum(gt_text > 0.5)) - (int)(torch.sum((gt_text > 0.5) & (training_mask <= 0.5)))
 

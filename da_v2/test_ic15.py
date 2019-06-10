@@ -129,7 +129,7 @@ def test(args):
         outputs = model(img)
 
         score = torch.sigmoid(outputs[:, 0, :, :])
-        outputs = (torch.sign(outputs - args.binary_th) + 1) / 2
+        outputs = (torcht.sign(outputs - args.binary_th) + 1) / 2
 
         text = outputs[:, 0, :, :]
         kernels = outputs[:, 0:args.kernel_num, :, :] * text

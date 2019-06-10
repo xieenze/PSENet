@@ -1,3 +1,4 @@
+#coding:utf8
 import sys
 import torch
 import argparse
@@ -19,13 +20,14 @@ import time
 import util
 
 from loss_opr import *
+import loss_opr
 
 from IPython import embed
 
 
 
 
-def get_G_LOSS(outputs,criterion):
+def get_G_LOSS(outputs, criterion, gt_kernels, gt_texts, training_masks):
     texts = outputs[:, 0, :, :]
     kernels = outputs[:, 1:, :, :]
     selected_masks = ohem_batch(texts, gt_texts, training_masks)
@@ -44,10 +46,10 @@ def get_G_LOSS(outputs,criterion):
     loss_kernel = loss_kernel * 0.3
     loss_text = loss_text * 0.7
     loss = loss_text + loss_kernel
-    return loss
+    return loss, loss_kernel, loss_text
 
 
-def train(train_loader, model_G, model_D1, criterion, optimizer_G, optimizer_D1, epoch):
+def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, epoch):
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -59,6 +61,7 @@ def train(train_loader, model_G, model_D1, criterion, optimizer_G, optimizer_D1,
     # labels for adversarial training
     source_label = 0
     target_label = 1
+    bce_loss = torch.nn.BCEWithLogitsLoss()
 
     end = time.time()
     for batch_idx, (source_imgs, gt_texts, gt_kernels, training_masks, target_imgs) in enumerate(train_loader):
@@ -71,16 +74,16 @@ def train(train_loader, model_G, model_D1, criterion, optimizer_G, optimizer_D1,
         training_masks = Variable(training_masks.cuda())
 
         optimizer_G.zero_grad()
-        optimizer_D1.zero_grad()
+        optimizer_D.zero_grad()
 
         # train G
         # don't accumulate grads in D
-        for param in model_D1.parameters():
+        for param in model_D.parameters():
             param.requires_grad = False
 
         # train with source
         outputs_source = model_G(source_imgs)
-        loss = get_G_LOSS(outputs_source, criterion)
+        loss, loss_kernel, loss_text = get_G_LOSS(outputs_source, criterion, gt_kernels, gt_texts, training_masks)
         loss.backward()
 
 
@@ -88,27 +91,31 @@ def train(train_loader, model_G, model_D1, criterion, optimizer_G, optimizer_D1,
         outputs_target = model_G(target_imgs)
         # bilinear 插值 变大
         # pass
-        D_out1 = model_D1(F.softmax(outputs_target))
-        loss_D1 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
-        loss_D1.backward()
+        # embed(header='check softmax')
+        # D_out1 = model_D(F.softmax(outputs_target))
+        D_out1 = model_D(outputs_target)
+        loss_D = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
+        loss_D.backward()
 
 
         # train D
         # bring back requires_grad
-        for param in model_D1.parameters():
+        for param in model_D.parameters():
             param.requires_grad = True
 
         # train with source
         outputs_source = outputs_source.detach()
-        D_out1 = model_D1(F.softmax(outputs_source))
-        loss_D1 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
-        loss_D1.backward()
+        # D_out1 = model_D(F.softmax(outputs_source))
+        D_out1 = model_D(outputs_source)
+        loss_D = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
+        loss_D.backward()
 
         # train with target
         outputs_target = outputs_target.detach()
-        D_out1 = model_D1(F.softmax(pred_target1))
-        loss_D1 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
-        loss_D1.backward()
+        # D_out1 = model_D(F.softmax(outputs_target))
+        D_out1 = model_D(outputs_target)
+        loss_D = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
+        loss_D.backward()
 
 
 
@@ -116,6 +123,8 @@ def train(train_loader, model_G, model_D1, criterion, optimizer_G, optimizer_D1,
         end = time.time()
 
         if batch_idx % 20 == 0:
+            texts = outputs_source[:, 0, :, :]
+            kernels = outputs_source[:, 1:, :, :]
             score_text = cal_text_score(texts, gt_texts, training_masks, running_metric_text)
             score_kernel = cal_kernel_score(kernels, gt_kernels, gt_texts, training_masks, running_metric_kernel)
             output_log  = 'Epoch:{epoch} | Batch: {bt:.3f}s | TOTAL: {total:.0f}min | ETA: {eta:.0f}min | Loss: {loss:.4f} | Loss_K: {loss_kernel:.4f} | Loss_T: {loss_text:.4f} | Loss_D: {loss_domain:.4f} | Acc_t: {acc: .4f} | IOU_t: {iou_t: .4f} | IOU_k: {iou_k: .4f}'.format(
@@ -123,10 +132,10 @@ def train(train_loader, model_G, model_D1, criterion, optimizer_G, optimizer_D1,
                 bt=batch_time.avg,
                 total=batch_time.avg * batch_idx / 60.0,
                 eta=batch_time.avg * (len(train_loader) - batch_idx) / 60.0,
-                loss=losses.avg,
+                loss=loss,
                 loss_kernel=loss_kernel,
                 loss_text=loss_text,
-                loss_domain=loss_domain,
+                loss_domain=loss_D,
                 acc=score_text['Mean Acc'],
                 iou_t=score_text['Mean IoU'],
                 iou_k=score_kernel['Mean IoU'])
@@ -135,7 +144,7 @@ def train(train_loader, model_G, model_D1, criterion, optimizer_G, optimizer_D1,
 
 
         optimizer_G.step()
-        optimizer_D1.step()
+        optimizer_D.step()
 
 
     return output_log
@@ -164,9 +173,10 @@ def main(args):
         else:
             args.checkpoint += "_pretrain_ic17"
 
-    print ('checkpoint path: %s'%args.checkpoint)
+    print ('\ncheckpoint path: %s'%args.checkpoint)
     print ('init lr: %.8f'%args.lr)
     print ('schedule: ', args.schedule)
+    print('loading model.....')
     sys.stdout.flush()
 
     if not os.path.isdir(args.checkpoint):
@@ -190,11 +200,12 @@ def main(args):
     model_G = torch.nn.DataParallel(model_G).cuda().train()
 
     #加载判别网络D
-    model_D1 = models.FCDiscriminator(num_classes=kernel_num)
-    model_D1 = torch.nn.DataParallel(model_D1).cuda().train()
+    model_D = models.FCDiscriminator(num_classes=kernel_num)
+    model_D = torch.nn.DataParallel(model_D).cuda().train()
 
     optimizer_G  = torch.optim.SGD(model_G.parameters(), lr=args.lr, momentum=0.99, weight_decay=5e-4)
-    optimizer_D1 = torch.optim.Adam(model_D1.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
+    #learning rate D 可能需要修改
+    optimizer_D = torch.optim.Adam(model_D.parameters(), lr=args.lr, betas=(0.9, 0.99))
 
     if args.pretrain:
         print('Using pretrained model.')
@@ -208,24 +219,29 @@ def main(args):
         start_epoch = checkpoint_G['epoch']
         model_G.load_state_dict(checkpoint_G['state_dict'])
         optimizer_G.load_state_dict(checkpoint_G['optimizer'])
-        #load D1
-        checkpoint_D1 = torch.load(args.resume)
-        model_D1.load_state_dict(checkpoint_D1['state_dict'])
-        optimizer_D1.load_state_dict(checkpoint_D1['optimizer'])
+        #load D
+        checkpoint_D = torch.load(args.resume)
+        model_D.load_state_dict(checkpoint_D['state_dict'])
+        optimizer_D.load_state_dict(checkpoint_D['optimizer'])
     else:
         print('Training from scratch.')
 
+
+    # embed(header='load model')
+
     for epoch in range(start_epoch, args.n_epoch):
         adjust_learning_rate(args, optimizer_G, epoch)
-        adjust_learning_rate(args, optimizer_D1, epoch)
+        adjust_learning_rate(args, optimizer_D, epoch)
 
-        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.n_epoch, optimizer.param_groups[0]['lr']))
+        print('\nEpoch: [{} | {}] LR_G: {}  LR_D: {}'.format(epoch + 1, args.n_epoch,
+                                                             optimizer_G.param_groups[0]['lr'],
+                                                             optimizer_D.param_groups[0]['lr']))
 
         # start training.....
         output_log = train(train_loader,
-                      model_G, model_D1,
+                      model_G, model_D,
                       dice_loss,
-                      optimizer_G, optimizer_D1,
+                      optimizer_G, optimizer_D,
                       epoch)
 
 
@@ -238,11 +254,11 @@ def main(args):
                 filename='G.pth')
 
         save_checkpoint({
-            'state_dict': model_D1.state_dict(),
+            'state_dict': model_D.state_dict(),
             'lr': args.lr,
-            'optimizer': optimizer_D1.state_dict(),
+            'optimizer': optimizer_D.state_dict(),
             }, checkpoint=args.checkpoint,
-                filename='D_1.pth')
+                filename='D.pth')
 
 
         #log for training process
