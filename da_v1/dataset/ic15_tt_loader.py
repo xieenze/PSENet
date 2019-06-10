@@ -330,7 +330,7 @@ class IC15_TT_Loader(data.Dataset):
 
 if __name__ == "__main__":
     loader = IC15_TT_Loader(is_transform=True, img_size=640, kernel_num=7, min_scale=0.4, short_size=736,debug=True)
-    ic15_img, gt_text, gt_kernels, training_mask, tt_img = loader[100]
+    ic15_img, gt_text, gt_kernels, training_mask, tt_img = loader[190]
     ic15_img = np.array(ic15_img)[:,:,::-1]
     tt_img = np.array(tt_img)[:,:,::-1]
 

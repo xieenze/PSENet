@@ -178,11 +178,11 @@ class ResNet(nn.Module):
 
     def _upsample(self, x, y, scale=1):
         _, _, H, W = y.size()
-        return F.upsample(x, size=(H // scale, W // scale), mode='bilinear')
+        return F.interpolate(x, size=(H // scale, W // scale), mode='bilinear')
 
     def _upsample_add(self, x, y):
         _, _, H, W = y.size()
-        return F.upsample(x, size=(H, W), mode='bilinear') + y
+        return F.interpolate(x, size=(H, W), mode='bilinear') + y
 
     def forward(self, x, from_tt=False):
         h = x
@@ -242,59 +242,8 @@ class ResNet(nn.Module):
         return out
 
 
-class ResNet_Frozen(nn.Module):
 
-    def __init__(self, block, layers):
-        self.inplanes = 64
-        super(ResNet_Frozen, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.relu1 = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        # self.avgpool = nn.AvgPool2d(7, stride=1)
-        # self.fc = nn.Linear(512 * block.expansion, num_classes)
 
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion),
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-        self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        h = x
-        h = self.conv1(h)
-        h = self.bn1(h)
-        h = self.relu1(h)
-        h = self.maxpool(h)
-
-        h = self.layer1(h)
-        c2 = h
-        h = self.layer2(h)
-        c3 = h
-        h = self.layer3(h)
-        c4 = h
-        h = self.layer4(h)
-        c5 = h
-
-        blocks = [c5, c4, c3, c2]
-
-        return blocks
 
 def resnet18(pretrained=False, **kwargs):
     """Constructs a ResNet-18 model.
@@ -336,21 +285,7 @@ def resnet50(pretrained=False, **kwargs):
         model.load_state_dict(state)
     return model
 
-def resnet50_frozen(pretrained=False, **kwargs):
-    model = ResNet_Frozen(Bottleneck, [3, 4, 6, 3], **kwargs)
-    if pretrained:
-        pretrained_model = model_zoo.load_url(model_urls['resnet50'])
-        state = model.state_dict()
-        for key in state.keys():
-            if key in pretrained_model.keys():
-                state[key] = pretrained_model[key]
-        model.load_state_dict(state)
-        #冻结权重
-        for p in model.parameters():
-            p.requires_grad = False
 
-
-    return model
 
 
 def resnet101(pretrained=False, **kwargs):
@@ -387,7 +322,6 @@ def resnet152(pretrained=False, **kwargs):
 
 
 if __name__ == "__main__":
-    model1 = resnet50_frozen(pretrained=True)
     model = resnet50(pretrained=True, num_classes=7)
 
     ic15_imgs = torch.randn(2, 3, 640, 640)

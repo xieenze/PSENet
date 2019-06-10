@@ -163,7 +163,7 @@ def train(train_loader, model, model_frozen, criterion, optimizer, epoch):
 
         loss_kernel = loss_kernel * 0.3
         loss_text = loss_text * 0.7
-        loss_domain = loss_domain * 0.5
+        loss_domain = loss_domain * 0.1
         loss = loss_text + loss_kernel + loss_domain
         losses.update(loss.item(), imgs.size(0))
 

@@ -1,0 +1,11 @@
+baseline
+python2 test_tt.py --resume checkpoints/ic15_resnet50_bs_16_ep_300/checkpoint.pth.tar  --kernel_num 3
+Precision:_0.645503791983_______/Recall:_0.547912885662/Hmean:_0.592718120999
+
+da_v1（参考ROAD）
+python2 test_tt.py --resume checkpoints/ic15_resnet50_bs_16_ep_300/checkpoint.pth.tar  --kernel_num 3
+掉点 loss_domain系数越大掉点越多
+
+
+da_v2(参考adaptSegNet)
+
