@@ -81,6 +81,8 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         # don't accumulate grads in D
         for param in model_D.parameters():
             param.requires_grad = False
+        for param in model_G.parameters():
+            param.requires_grad = True
 
         # train with source
         outputs_source = model_G(source_imgs)
