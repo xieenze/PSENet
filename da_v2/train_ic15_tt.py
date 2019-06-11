@@ -91,7 +91,8 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         # train with target
         outputs_target = model_G(target_imgs)
         # loss_adv = 0
-        D_out1 = model_D(F.sigmoid(outputs_target))
+        # D_out1 = model_D(F.sigmoid(outputs_target))
+        D_out1 = model_D(F.sigmoid(outputs_target)*255)
         loss_adv = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
         loss_adv.backward()
 
@@ -100,16 +101,21 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         # bring back requires_grad
         for param in model_D.parameters():
             param.requires_grad = True
+        # don't accumulate grads in G
+        for param in model_G.parameters():
+            param.requires_grad = False
+
+
 
         # train with source
-        outputs_source = outputs_source.detach()
+        # outputs_source = outputs_source.detach()
         # D_out1 = model_D(F.sigmoid(outputs_source))
         D_out1 = model_D(F.sigmoid(outputs_source)*255)
         loss_D1 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
         # loss_D1.backward()
 
         # train with target
-        outputs_target = outputs_target.detach()
+        # outputs_target = outputs_target.detach()
         # D_out1 = model_D(F.sigmoid(outputs_target))
         D_out1 = model_D(F.sigmoid(outputs_target)*255)
         loss_D2 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())

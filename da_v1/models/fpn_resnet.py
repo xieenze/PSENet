@@ -178,11 +178,13 @@ class ResNet(nn.Module):
 
     def _upsample(self, x, y, scale=1):
         _, _, H, W = y.size()
-        return F.interpolate(x, size=(H // scale, W // scale), mode='bilinear')
+        # return F.interpolate(x, size=(H // scale, W // scale), mode='bilinear')
+        return F.interpolate(x, size=(H // scale, W // scale), align_corners = False)
 
     def _upsample_add(self, x, y):
         _, _, H, W = y.size()
-        return F.interpolate(x, size=(H, W), mode='bilinear') + y
+        # return F.interpolate(x, size=(H, W), mode='bilinear') + y
+        return F.interpolate(x, size=(H, W), align_corners = False) + y
 
     def forward(self, x, from_tt=False):
         h = x
