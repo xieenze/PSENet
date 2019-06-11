@@ -21,6 +21,8 @@ import Polygon as plg
 from pse import pse
 import util
 import collections
+from IPython import embed
+
 
 def extend_3c(img):
     img = img.reshape(img.shape[0], img.shape[1], 1)
@@ -133,7 +135,6 @@ def test(args):
         score = score.data.cpu().numpy()[0].astype(np.float32)
         text = text.data.cpu().numpy()[0].astype(np.uint8)
         kernels = kernels.data.cpu().numpy()[0].astype(np.uint8)
-        
         # c++ version pse
         pred = pse(kernels, args.min_kernel_area / (args.scale * args.scale))
 

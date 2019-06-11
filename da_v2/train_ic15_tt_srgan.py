@@ -1,4 +1,4 @@
-#coding:utf8
+# coding:utf8
 import sys
 import torch
 import argparse
@@ -25,8 +25,6 @@ import loss_opr
 from IPython import embed
 
 
-
-
 def get_G_LOSS(outputs, criterion, gt_kernels, gt_texts, training_masks):
     texts = outputs[:, 0, :, :]
     kernels = outputs[:, 1:, :, :]
@@ -49,15 +47,12 @@ def get_G_LOSS(outputs, criterion, gt_kernels, gt_texts, training_masks):
     return loss, loss_kernel, loss_text
 
 
-
 def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, epoch):
-
     batch_time = AverageMeter()
     data_time = AverageMeter()
-    # losses = AverageMeter()
+    losses = AverageMeter()
     running_metric_text = runningScore(2)
     running_metric_kernel = runningScore(2)
-
 
     # labels for adversarial training
     source_label = 0
@@ -74,6 +69,7 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         gt_kernels = Variable(gt_kernels.cuda())
         training_masks = Variable(training_masks.cuda())
 
+
         optimizer_G.zero_grad()
         optimizer_D.zero_grad()
 
@@ -87,14 +83,12 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         loss, loss_kernel, loss_text = get_G_LOSS(outputs_source, criterion, gt_kernels, gt_texts, training_masks)
         loss.backward()
 
-
         # train with target
         outputs_target = model_G(target_imgs)
-        # loss_adv = 0
-        D_out1 = model_D(F.sigmoid(outputs_target))
+        texts = outputs_target[:, 0:1, :, :]
+        D_out1 = model_D(F.sigmoid(texts))
         loss_adv = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
         loss_adv.backward()
-
 
         # train D
         # bring back requires_grad
@@ -103,20 +97,21 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
 
         # train with source
         outputs_source = outputs_source.detach()
-        # D_out1 = model_D(F.sigmoid(outputs_source))
-        D_out1 = model_D(F.sigmoid(outputs_source)*255)
+        texts = outputs_source[:, 0:1, :, :]
+        D_out1 = model_D(F.sigmoid(texts))
         loss_D1 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
-        # loss_D1.backward()
+        loss_D1.backward()
 
         # train with target
         outputs_target = outputs_target.detach()
-        # D_out1 = model_D(F.sigmoid(outputs_target))
-        D_out1 = model_D(F.sigmoid(outputs_target)*255)
+        texts = outputs_target[:, 0:1, :, :]
+        D_out1 = model_D(F.sigmoid(texts))
         loss_D2 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
-        # loss_D2.backward()
-        loss_D = loss_D1 + loss_D2
-        loss_D.backward()
+        loss_D2.backward()
 
+
+        # loss_D = 1 - loss_D1 + loss_D2
+        # loss_D.backward()
 
         batch_time.update(time.time() - end)
         end = time.time()
@@ -129,7 +124,7 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
             kernels = outputs_source[:, 1:, :, :]
             score_text = cal_text_score(texts, gt_texts, training_masks, running_metric_text)
             score_kernel = cal_kernel_score(kernels, gt_kernels, gt_texts, training_masks, running_metric_kernel)
-            output_log  = 'Epoch:{epoch} | Batch: {bt:.3f}s | TOTAL: {total:.0f}min | ETA: {eta:.0f}min | Loss: {loss:.3f} | Loss_K: {loss_kernel:.3f} | Loss_T: {loss_text:.3f} | Loss_adv: {loss_adv:.3f} | Loss_D1: {loss_d1:.3f} | Loss_D2: {loss_d2:.3f} | Acc_t: {acc: .4f} | IOU_t: {iou_t: .4f} | IOU_k: {iou_k: .4f}'.format(
+            output_log = 'Epoch:{epoch} | Batch: {bt:.3f}s | TOTAL: {total:.0f}min | ETA: {eta:.0f}min | Loss: {loss:.3f} | Loss_K: {loss_kernel:.3f} | Loss_T: {loss_text:.3f} | Loss_adv: {loss_adv:.3f} | Loss_D1: {loss_d1:.3f} | Loss_D2: {loss_d2:.3f} | Acc_t: {acc: .4f} | IOU_t: {iou_t: .4f} | IOU_k: {iou_k: .4f}'.format(
                 epoch=epoch,
                 bt=batch_time.avg,
                 total=batch_time.avg * batch_idx / 60.0,
@@ -137,7 +132,7 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
                 loss=loss,
                 loss_kernel=loss_kernel,
                 loss_text=loss_text,
-                loss_adv=loss_adv,
+                loss_adv=0,
                 loss_d1=loss_D1,
                 loss_d2=loss_D2,
                 acc=score_text['Mean Acc'],
@@ -145,7 +140,9 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
                 iou_k=score_kernel['Mean IoU'])
             print(output_log)
             sys.stdout.flush()
+
     return output_log
+
 
 def adjust_learning_rate_G(args, optimizer, epoch):
     global state
@@ -154,6 +151,7 @@ def adjust_learning_rate_G(args, optimizer, epoch):
         for param_group in optimizer.param_groups:
             param_group['lr'] = args.lr_G
 
+
 def adjust_learning_rate_D(args, optimizer, epoch):
     global state
     if epoch in args.schedule:
@@ -161,9 +159,11 @@ def adjust_learning_rate_D(args, optimizer, epoch):
         for param_group in optimizer.param_groups:
             param_group['lr'] = args.lr_D
 
+
 def save_checkpoint(state, checkpoint='checkpoint', filename='checkpoint.pth.tar'):
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
+
 
 def main(args):
     # 据说能加速
@@ -171,16 +171,16 @@ def main(args):
     cudnn.benchmark = True
 
     if args.checkpoint == '':
-        args.checkpoint = "checkpoints/ic15_%s_bs_%d_ep_%d"%(args.arch, args.batch_size, args.n_epoch)
+        args.checkpoint = "checkpoints/ic15_%s_bs_%d_ep_%d" % (args.arch, args.batch_size, args.n_epoch)
     if args.pretrain:
         if 'synth' in args.pretrain:
             args.checkpoint += "_pretrain_synth"
         else:
             args.checkpoint += "_pretrain_ic17"
 
-    print ('\ncheckpoint path: %s'%args.checkpoint)
-    print ('init lr: %.8f'%args.lr_G)
-    print ('schedule: ', args.schedule)
+    print('\ncheckpoint path: %s' % args.checkpoint)
+    print('init lr: %.8f' % args.lr_G)
+    print('schedule: ', args.schedule)
     print('loading model.....')
     sys.stdout.flush()
 
@@ -200,15 +200,15 @@ def main(args):
         drop_last=True,
         pin_memory=True)
 
-    #加载生成器G
+    # 加载生成器G
     model_G = models.resnet50(pretrained=True, num_classes=kernel_num)
     model_G = torch.nn.DataParallel(model_G).cuda().train()
 
-    #加载判别网络D
-    model_D = models.FCDiscriminator(num_classes=kernel_num)
+    # 加载判别网络D
+    model_D = models.FCDiscriminator(num_classes=1)
     model_D = torch.nn.DataParallel(model_D).cuda().train()
 
-    optimizer_G  = torch.optim.SGD(model_G.parameters(), lr=args.lr_G, momentum=0.99, weight_decay=5e-4)
+    optimizer_G = torch.optim.SGD(model_G.parameters(), lr=args.lr_G, momentum=0.99, weight_decay=5e-4)
     optimizer_D = torch.optim.Adam(model_D.parameters(), lr=args.lr_D, betas=(0.9, 0.99))
 
     if args.pretrain:
@@ -218,19 +218,17 @@ def main(args):
         model_G.load_state_dict(checkpoint['state_dict'])
     elif args.resume:
         print('Resuming from checkpoint.')
-        #load G
+        # load G
         checkpoint_G = torch.load(args.resume)
         start_epoch = checkpoint_G['epoch']
         model_G.load_state_dict(checkpoint_G['state_dict'])
         optimizer_G.load_state_dict(checkpoint_G['optimizer'])
-        #load D
+        # load D
         checkpoint_D = torch.load(args.resume)
         model_D.load_state_dict(checkpoint_D['state_dict'])
         optimizer_D.load_state_dict(checkpoint_D['optimizer'])
     else:
         print('Training from scratch.')
-
-
 
     for epoch in range(start_epoch, args.n_epoch):
         adjust_learning_rate_G(args, optimizer_G, epoch)
@@ -242,29 +240,27 @@ def main(args):
 
         # start training.....
         output_log = train(train_loader,
-                      model_G, model_D,
-                      dice_loss,
-                      optimizer_G, optimizer_D,
-                      epoch)
-
+                           model_G, model_D,
+                           dice_loss,
+                           optimizer_G, optimizer_D,
+                           epoch)
 
         save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model_G.state_dict(),
-                'lr': args.lr_G,
-                'optimizer' : optimizer_G.state_dict(),
-            }, checkpoint=args.checkpoint,
-                filename='G.pth')
+            'epoch': epoch + 1,
+            'state_dict': model_G.state_dict(),
+            'lr': args.lr_G,
+            'optimizer': optimizer_G.state_dict(),
+        }, checkpoint=args.checkpoint,
+            filename='G.pth')
 
         save_checkpoint({
             'state_dict': model_D.state_dict(),
             'lr': args.lr_D,
             'optimizer': optimizer_D.state_dict(),
-            }, checkpoint=args.checkpoint,
-                filename='D.pth')
+        }, checkpoint=args.checkpoint,
+            filename='D.pth')
 
-
-        #log for training process
+        # log for training process
         log_path = os.path.join(args.checkpoint, 'log.txt')
         # os.system('rm -rf {}'.format(log_path))
         with open(log_path, 'a+') as f:
@@ -274,24 +270,24 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Hyperparams')
     parser.add_argument('--arch', nargs='?', type=str, default='resnet50')
-    parser.add_argument('--img_size', nargs='?', type=int, default=640, 
+    parser.add_argument('--img_size', nargs='?', type=int, default=640,
                         help='Height of the input image')
-    parser.add_argument('--n_epoch', nargs='?', type=int, default=600, 
+    parser.add_argument('--n_epoch', nargs='?', type=int, default=600,
                         help='# of the epochs')
     parser.add_argument('--schedule', type=int, nargs='+', default=[200, 400],
                         help='Decrease learning rate at these epochs.')
-    parser.add_argument('--batch_size', nargs='?', type=int, default=16, 
+    parser.add_argument('--batch_size', nargs='?', type=int, default=16,
                         help='Batch Size')
     parser.add_argument('--lr_G', nargs='?', type=float, default=2.5e-4,
                         help='Learning Rate')
     parser.add_argument('--lr_D', nargs='?', type=float, default=1e-4,
                         help='Learning Rate')
-    parser.add_argument('--resume', nargs='?', type=str, default=None,    
+    parser.add_argument('--resume', nargs='?', type=str, default=None,
                         help='Path to previous saved model to restart from')
-    parser.add_argument('--pretrain', nargs='?', type=str, default=None,    
+    parser.add_argument('--pretrain', nargs='?', type=str, default=None,
                         help='Path to previous saved model to restart from')
     parser.add_argument('--checkpoint', default='', type=str, metavar='PATH',
-                    help='path to save checkpoint (default: checkpoint)')
+                        help='path to save checkpoint (default: checkpoint)')
     args = parser.parse_args()
 
     main(args)
