@@ -87,7 +87,7 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         # train with source
         outputs_source = model_G(source_imgs)
         loss, loss_kernel, loss_text = get_G_LOSS(outputs_source, criterion, gt_kernels, gt_texts, training_masks)
-        loss.backward()
+        loss.backward(retain_graph=True)
 
 
         # train with target
@@ -96,7 +96,7 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         # D_out1 = model_D(F.sigmoid(outputs_target))
         D_out1 = model_D(F.sigmoid(outputs_target)*255)
         loss_adv = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
-        loss_adv.backward()
+        loss_adv.backward(retain_graph=True)
 
 
         # train D

@@ -22,7 +22,8 @@ class FCDiscriminator(nn.Module):
 		self.leaky_relu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
 		# self.classifier = nn.Conv2d(ndf*8, 1, kernel_size=3, stride=2, padding=1)
-		self.classifier = nn.Linear(819200, 1)
+		self.avgpool = nn.AvgPool2d(40)
+		self.classifier = nn.Linear(ndf*8, 1)
 
 		for m in self.modules():
 			if isinstance(m, nn.Conv2d):
@@ -31,9 +32,6 @@ class FCDiscriminator(nn.Module):
 			elif isinstance(m, nn.BatchNorm2d):
 				m.weight.data.fill_(1)
 				m.bias.data.zero_()
-
-
-
 
 	def forward(self, x):
 		x = self.conv1(x)
@@ -52,6 +50,7 @@ class FCDiscriminator(nn.Module):
 		x = self.bn4(x)
 		x = self.leaky_relu(x)
 
+		x = self.avgpool(x)
 		x = x.view(x.size(0), -1)
 		x = self.classifier(x)
 		return x
