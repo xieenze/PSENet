@@ -78,27 +78,28 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         # don't accumulate grads in D
         for param in model_D.parameters():
             param.requires_grad = False
-        for param in model_G.parameters():
-            param.requires_grad = True
+        # for param in model_G.parameters():
+        #     param.requires_grad = True
 
         # train with source
-        outputs_source = model_G(source_imgs)
+        outputs_source_fmap, outputs_source = model_G(source_imgs)
         loss, loss_kernel, loss_text = get_G_LOSS(outputs_source, criterion, gt_kernels, gt_texts, training_masks)
-
-        D_out1 = model_D(F.sigmoid(outputs_source))
-        loss_adv = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
         loss.backward(retain_graph=True)
-        loss_adv.backward(retain_graph=True)
+
+        D_out1 = model_D(outputs_source_fmap)
+        loss_adv_s = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
+
 
 
 
 
         # train with target
-        outputs_target = model_G(target_imgs)
-        # D_out1 = model_D(F.sigmoid(outputs_target))
-        D_out1 = model_D(F.sigmoid(outputs_source))
-        loss_adv = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
-        loss_adv.backward(retain_graph=True)
+        outputs_target_fmap, outputs_target = model_G(target_imgs)
+        D_out1 = model_D(outputs_target_fmap)
+        loss_adv_t = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
+
+        loss_adv = loss_adv_s + loss_adv_t
+        loss_adv.backward()
 
 
         # train D
@@ -106,22 +107,20 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         for param in model_D.parameters():
             param.requires_grad = True
         # don't accumulate grads in G
-        for param in model_G.parameters():
-            param.requires_grad = False
+        # for param in model_G.parameters():
+        #     param.requires_grad = False
 
 
 
         # train with source
-        # outputs_source = outputs_source.detach()
-        # D_out1 = model_D(F.sigmoid(outputs_source))
-        D_out1 = model_D(F.sigmoid(outputs_source))
+        outputs_source_fmap = outputs_source_fmap.detach()
+        D_out1 = model_D(outputs_source_fmap)
         loss_D1 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
         # loss_D1.backward()
 
         # train with target
-        # outputs_target = outputs_target.detach()
-        # D_out1 = model_D(F.sigmoid(outputs_target))
-        D_out1 = model_D(F.sigmoid(outputs_target))
+        outputs_target_fmap = outputs_target_fmap.detach()
+        D_out1 = model_D(outputs_target_fmap)
         loss_D2 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
         # loss_D2.backward()
         loss_D = loss_D1 + loss_D2
@@ -179,6 +178,8 @@ def main(args):
     # 据说能加速
     cudnn.enabled = True
     cudnn.benchmark = True
+    args.batch_size *= torch.cuda.device_count()
+    print("batch size=",args.batch_size)
 
     if args.checkpoint == '':
         args.checkpoint = "checkpoints/ic15_%s_bs_%d_ep_%d"%(args.arch, args.batch_size, args.n_epoch)
@@ -215,7 +216,7 @@ def main(args):
     model_G = torch.nn.DataParallel(model_G).cuda().train()
 
     #加载判别网络D
-    model_D = models.FCDiscriminator(num_classes=kernel_num)
+    model_D = models.FCDiscriminator(num_classes=256)
     model_D = torch.nn.DataParallel(model_D).cuda().train()
 
     optimizer_G  = torch.optim.SGD(model_G.parameters(), lr=args.lr_G, momentum=0.99, weight_decay=5e-4)
@@ -292,8 +293,8 @@ if __name__ == '__main__':
                         help='# of the epochs')
     parser.add_argument('--schedule', type=int, nargs='+', default=[200, 400],
                         help='Decrease learning rate at these epochs.')
-    parser.add_argument('--batch_size', nargs='?', type=int, default=16, 
-                        help='Batch Size')
+    parser.add_argument('--batch_size', nargs='?', type=int, default=4,
+                        help='Batch Size per gpu')
     parser.add_argument('--lr_G', nargs='?', type=float, default=2.5e-4,
                         help='Learning Rate')
     parser.add_argument('--lr_D', nargs='?', type=float, default=1e-4,

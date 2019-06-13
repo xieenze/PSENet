@@ -8,4 +8,8 @@ python2 test_tt.py --resume checkpoints/ic15_resnet50_bs_16_ep_300/checkpoint.pt
 
 
 da_v2(参考adaptSegNet)
+掉点
+
+da_v3
+基于da_v2 判别器的监督 由G的输出改为1/4的feature map.
 
