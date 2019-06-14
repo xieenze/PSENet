@@ -241,7 +241,8 @@ class IC15_TT_Loader(data.Dataset):
         bboxes, tags = get_bboxes(img, gt_path)
 
         #tt
-        tt_img_paths = self.tt_img_paths[index]
+        rand_index = np.random.randint(len(self.tt_img_paths))
+        tt_img_paths = self.tt_img_paths[rand_index]
         tt_img = get_img(tt_img_paths)
 
         if self.is_transform:

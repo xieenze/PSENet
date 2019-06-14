@@ -96,8 +96,10 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         # train with target
         outputs_target_fmap, outputs_target = model_G(target_imgs)
         D_out1 = model_D(outputs_target_fmap)
-        loss_adv_t = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
+        loss_adv_t = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
 
+        '''测试不训loss_adv是否会收敛'''
+        # loss_adv = 0
         loss_adv = loss_adv_s + loss_adv_t
         loss_adv.backward()
 

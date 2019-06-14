@@ -124,7 +124,7 @@ def test(args):
         torch.cuda.synchronize()
         start = time.time()
 
-        outputs = model(img)
+        _, outputs = model(img)
 
         score = torch.sigmoid(outputs[:, 0, :, :])
         outputs = (torch.sign(outputs - args.binary_th) + 1) / 2
