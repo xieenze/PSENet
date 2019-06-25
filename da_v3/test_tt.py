@@ -135,6 +135,7 @@ def test(args):
         score = score.data.cpu().numpy()[0].astype(np.float32)
         text = text.data.cpu().numpy()[0].astype(np.uint8)
         kernels = kernels.data.cpu().numpy()[0].astype(np.uint8)
+        # embed()
         # c++ version pse
         pred = pse(kernels, args.min_kernel_area / (args.scale * args.scale))
 

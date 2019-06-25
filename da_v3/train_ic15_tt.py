@@ -41,8 +41,8 @@ def get_G_LOSS(outputs, criterion, gt_kernels, gt_texts, training_masks):
         loss_kernels.append(loss_kernel_i)
     loss_kernel = sum(loss_kernels) / len(loss_kernels)
 
-    loss_kernel = loss_kernel * 0.3
-    loss_text = loss_text * 0.7
+    loss_kernel = loss_kernel * 0.7
+    loss_text = loss_text * 0.3
     loss = loss_text + loss_kernel
     return loss, loss_kernel, loss_text
 
@@ -59,7 +59,7 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
     # labels for adversarial training
     source_label = 0
     target_label = 1
-    bce_loss = torch.nn.BCEWithLogitsLoss()
+    bce_loss = torch.nn.CrossEntropyLoss()
 
     end = time.time()
     for batch_idx, (source_imgs, gt_texts, gt_kernels, training_masks, target_imgs) in enumerate(train_loader):
@@ -71,11 +71,12 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         gt_kernels = Variable(gt_kernels.cuda())
         training_masks = Variable(training_masks.cuda())
 
-        optimizer_G.zero_grad()
-        optimizer_D.zero_grad()
 
         # train G
         # don't accumulate grads in D
+
+        model_G.zero_grad()
+
         for param in model_D.parameters():
             param.requires_grad = False
         # for param in model_G.parameters():
@@ -86,54 +87,58 @@ def train(train_loader, model_G, model_D, criterion, optimizer_G, optimizer_D, e
         loss, loss_kernel, loss_text = get_G_LOSS(outputs_source, criterion, gt_kernels, gt_texts, training_masks)
         loss.backward(retain_graph=True)
 
+        optimizer_G.step()
+
+        model_G.zero_grad()
+
         D_out1 = model_D(outputs_source_fmap)
-        loss_adv_s = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
-
-
-
-
+        loss_adv_s = bce_loss(D_out1, Variable(torch.LongTensor(D_out1.size()[0]).fill_(target_label)).cuda())
 
         # train with target
         outputs_target_fmap, outputs_target = model_G(target_imgs)
         D_out1 = model_D(outputs_target_fmap)
-        loss_adv_t = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
+        loss_adv_t = bce_loss(D_out1, Variable(torch.LongTensor(D_out1.size()[0]).fill_(source_label)).cuda())
 
-        '''测试不训loss_adv是否会收敛'''
-        # loss_adv = 0
-        loss_adv = loss_adv_s + loss_adv_t
+        loss_adv = 0.01 * loss_adv_s + 0.01 * loss_adv_t
         loss_adv.backward()
+
+        optimizer_G.step()
+
+
 
 
         # train D
         # bring back requires_grad
+
+        model_D.zero_grad()
+
         for param in model_D.parameters():
             param.requires_grad = True
         # don't accumulate grads in G
         # for param in model_G.parameters():
         #     param.requires_grad = False
 
-
-
         # train with source
         outputs_source_fmap = outputs_source_fmap.detach()
         D_out1 = model_D(outputs_source_fmap)
-        loss_D1 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(source_label)).cuda())
+        loss_D1 = bce_loss(D_out1, Variable(torch.LongTensor(D_out1.size()[0]).fill_(source_label)).cuda())
         # loss_D1.backward()
 
         # train with target
         outputs_target_fmap = outputs_target_fmap.detach()
         D_out1 = model_D(outputs_target_fmap)
-        loss_D2 = bce_loss(D_out1, Variable(torch.FloatTensor(D_out1.data.size()).fill_(target_label)).cuda())
+        loss_D2 = bce_loss(D_out1, Variable(torch.LongTensor(D_out1.size()[0]).fill_(target_label)).cuda())
         # loss_D2.backward()
         loss_D = loss_D1 + loss_D2
         loss_D.backward()
+
+        optimizer_D.step()
+
 
 
         batch_time.update(time.time() - end)
         end = time.time()
 
-        optimizer_G.step()
-        optimizer_D.step()
 
         if batch_idx % 20 == 0:
             texts = outputs_source[:, 0, :, :]

@@ -23,7 +23,7 @@ class FCDiscriminator(nn.Module):
 
 		# self.classifier = nn.Conv2d(ndf*8, 1, kernel_size=3, stride=2, padding=1)
 		self.avgpool = nn.AvgPool2d(10)
-		self.classifier = nn.Linear(ndf, 1)
+		self.classifier = nn.Linear(ndf, 2)
 
 		for m in self.modules():
 			if isinstance(m, nn.Conv2d):
@@ -64,7 +64,8 @@ if __name__ == "__main__":
 	model_1 = FCDiscriminator(256)
 	out1 = model_1(imgs)
 
-	bce_loss = torch.nn.BCEWithLogitsLoss()
+	bce_loss = torch.nn.CrossEntropyLoss()
 	pred = out1
-	gt = torch.FloatTensor(pred.size()).fill_(1)
+	gt = torch.LongTensor(pred.size()[0]).fill_(1)
+	embed()
 

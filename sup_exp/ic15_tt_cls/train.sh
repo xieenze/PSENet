@@ -1,0 +1,1 @@
+python3 imagenet.py -a resnet18  --epochs 90 --schedule 31 61 --gamma 0.1 -c checkpoints/imagenet/resnet18

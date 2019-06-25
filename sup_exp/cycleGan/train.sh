@@ -1,0 +1,11 @@
+python3 train.py --dataroot /home/xieenze/PSENet/data/cls_ic15_tt/cycleGan_data/ \
+                 --name maps_cyclegan \
+                 --model cycle_gan \
+                 --gpu_ids 0,1,2,3 \
+                 --batch_size 4 \
+                 --display_id -1\
+                 --preprocess scale_width_and_crop \
+                 --load_size 720 \
+                 --crop_size 440\
+                 --niter 50\
+                 --niter_decay 50
