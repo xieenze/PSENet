@@ -613,3 +613,12 @@ class PixelDiscriminator(nn.Module):
     def forward(self, input):
         """Standard forward."""
         return self.net(input)
+
+
+if __name__ == "__main__":
+    from IPython import embed
+    imgs = torch.randn(2, 3, 400, 400)
+    model = define_G(3, 3, 64, netG='resnet_9blocks')
+    out = model(imgs)
+    embed()
+

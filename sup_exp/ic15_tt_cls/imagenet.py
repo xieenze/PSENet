@@ -119,6 +119,8 @@ def main():
     # Data loading code
     traindir = '/home/xieenze/PSENet/data/cls_ic15_tt/train'
     valdir = '/home/xieenze/PSENet/data/cls_ic15_tt/val'
+
+    testdir = '/home/xieenze/PSENet/data/ICDAR2015/Challenge4/tmp'
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -141,6 +143,17 @@ def main():
         ])),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
+
+    test_loader = torch.utils.data.DataLoader(
+        datasets.ImageFolder(testdir, transforms.Compose([
+            transforms.Scale(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ])),
+        batch_size=args.test_batch, shuffle=False,
+        num_workers=args.workers, pin_memory=True)
+
 
 
     # create model
@@ -195,8 +208,10 @@ def main():
 
 
     if args.evaluate:
+        # embed()
         print('\nEvaluation only')
-        test_loss, test_acc = test(val_loader, model, criterion, start_epoch, use_cuda)
+        # test_loss, test_acc = test(val_loader, model, criterion, start_epoch, use_cuda)
+        test_loss, test_acc = test(test_loader, model, criterion, start_epoch, use_cuda)
         print(' Test Loss:  %.8f, Test Acc:  %.2f' % (test_loss, test_acc))
         return
 
@@ -302,6 +317,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
     end = time.time()
     bar = Bar('Processing', max=len(val_loader))
     for batch_idx, (inputs, targets) in enumerate(val_loader):
+        # embed()
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -311,6 +327,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
 
         # compute output
         outputs = model(inputs)
+        # embed()
         loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
@@ -338,6 +355,9 @@ def test(val_loader, model, criterion, epoch, use_cuda):
         bar.next()
     bar.finish()
     return (losses.avg, top1.avg)
+
+
+
 
 def save_checkpoint(state, is_best, checkpoint='checkpoint', filename='checkpoint.pth.tar'):
     filepath = os.path.join(checkpoint, filename)

@@ -21,6 +21,7 @@ import Polygon as plg
 from pse import pse
 import util
 import collections
+from IPython import embed
 
 def extend_3c(img):
     img = img.reshape(img.shape[0], img.shape[1], 1)
@@ -115,10 +116,10 @@ def test(args):
         sys.stdout.flush()
         
         img = Variable(img.cuda(), volatile=True)
-        # scale 0.5 2
-        # img = nn.functional.interpolate(img, scale_factor=0.5, mode='bilinear')
-        # img = nn.functional.interpolate(img, scale_factor=2.0, mode='bilinear')
-
+        # embed()
+        #scale 0.5 2
+        img = nn.functional.interpolate(img,scale_factor=0.5, mode='bilinear')
+        img = nn.functional.interpolate(img, scale_factor=2.0, mode='bilinear')
 
         org_img = org_img.numpy().astype('uint8')[0]
         text_box = org_img.copy()
